@@ -74,19 +74,39 @@ class Leaderboard:
         self.save_scores()
 
 class Menu:
-    def __init__(self, screen):
+    def __init__(self, screen, grid_x, grid_y, grid_width, grid_height, block_size):
         self.screen = screen
         self.font = pygame.font.Font(None, 48)
+        self.grid_x = grid_x
+        self.grid_y = grid_y
+        self.grid_width = grid_width
+        self.grid_height = grid_height
+        self.block_size = block_size
         
     def draw_main_menu(self):
         self.screen.fill(COLORS['BLACK'])
         title = self.font.render('TETRIS', True, COLORS['WHITE'])
         start = self.font.render('Press ENTER to Start', True, COLORS['WHITE'])
-        quit = self.font.render('Press Q to Quit', True, COLORS['WHITE'])
+        quit_msg = self.font.render('Press Q to Quit', True, COLORS['WHITE'])
         
-        self.screen.blit(title, (CONFIG['window']['width']//2 - title.get_width()//2, 200))
+        self.screen.blit(title, (CONFIG['window']['width']//2 - title.get_width()//2, 100))
         self.screen.blit(start, (CONFIG['window']['width']//2 - start.get_width()//2, 300))
-        self.screen.blit(quit, (CONFIG['window']['width']//2 - quit.get_width()//2, 400))
+        self.screen.blit(quit_msg, (CONFIG['window']['width']//2 - quit_msg.get_width()//2, 400))
+        
+        # Draw empty grid frame on menu
+        border_thickness = 2
+        pygame.draw.line(self.screen, COLORS['WHITE'],
+                        (self.grid_x, self.grid_y),
+                        (self.grid_x, self.grid_y + self.grid_height * self.block_size),
+                        border_thickness)
+        pygame.draw.line(self.screen, COLORS['WHITE'],
+                        (self.grid_x + self.grid_width * self.block_size, self.grid_y),
+                        (self.grid_x + self.grid_width * self.block_size, self.grid_y + self.grid_height * self.block_size),
+                        border_thickness)
+        pygame.draw.line(self.screen, COLORS['WHITE'],
+                        (self.grid_x, self.grid_y + self.grid_height * self.block_size),
+                        (self.grid_x + self.grid_width * self.block_size, self.grid_y + self.grid_height * self.block_size),
+                        border_thickness)
         
     def draw_game_over(self, score):
         self.screen.fill(COLORS['BLACK'])
@@ -94,24 +114,29 @@ class Menu:
         score_text = self.font.render(f'Score: {score}', True, COLORS['WHITE'])
         restart = self.font.render('Press R to Restart', True, COLORS['WHITE'])
         
-        self.screen.blit(game_over, (CONFIG['window']['width']//2 - game_over.get_width()//2, 200))
-        self.screen.blit(score_text, (CONFIG['window']['width']//2 - score_text.get_width()//2, 300))
-        self.screen.blit(restart, (CONFIG['window']['width']//2 - restart.get_width()//2, 400))
+        self.screen.blit(game_over, (CONFIG['window']['width']//2 - game_over.get_width()//2, 150))
+        self.screen.blit(score_text, (CONFIG['window']['width']//2 - score_text.get_width()//2, 250))
+        self.screen.blit(restart, (CONFIG['window']['width']//2 - restart.get_width()//2, 350))
 
 class TetrisGame:
     def __init__(self):
         self.screen = pygame.display.set_mode((CONFIG['window']['width'], CONFIG['window']['height']))
         pygame.display.set_caption('Tetris')
         
-        self.clock = pygame.time.Clock()
-        self.audio = AudioManager()
-        self.leaderboard = Leaderboard()
-        self.menu = Menu(self.screen)
-        
         self.grid_width = 10
         self.grid_height = 20
         self.block_size = 30
         self.grid = [[0] * self.grid_width for _ in range(self.grid_height)]
+        
+        # Calculate grid position
+        self.grid_x = (CONFIG['window']['width'] - self.grid_width * self.block_size) // 2
+        self.grid_y = 50
+        
+        self.clock = pygame.time.Clock()
+        self.audio = AudioManager()
+        self.leaderboard = Leaderboard()
+        
+        self.menu = Menu(self.screen, self.grid_x, self.grid_y, self.grid_width, self.grid_height, self.block_size)
         
         self.current_piece = None
         self.current_piece_x = 0
@@ -164,12 +189,34 @@ class TetrisGame:
     def draw(self):
         self.screen.fill(COLORS['BLACK'])
         
+        # Draw grid borders (left, right, bottom)
+        border_color = COLORS['WHITE']
+        border_thickness = 2
+        
+        # Left border
+        pygame.draw.line(self.screen, border_color,
+                        (self.grid_x, self.grid_y),
+                        (self.grid_x, self.grid_y + self.grid_height * self.block_size),
+                        border_thickness)
+        
+        # Right border
+        pygame.draw.line(self.screen, border_color,
+                        (self.grid_x + self.grid_width * self.block_size, self.grid_y),
+                        (self.grid_x + self.grid_width * self.block_size, self.grid_y + self.grid_height * self.block_size),
+                        border_thickness)
+        
+        # Bottom border
+        pygame.draw.line(self.screen, border_color,
+                        (self.grid_x, self.grid_y + self.grid_height * self.block_size),
+                        (self.grid_x + self.grid_width * self.block_size, self.grid_y + self.grid_height * self.block_size),
+                        border_thickness)
+        
         # Draw grid
         for y in range(self.grid_height):
             for x in range(self.grid_width):
                 if self.grid[y][x]:
                     pygame.draw.rect(self.screen, COLORS['WHITE'],
-                                  (x * self.block_size, y * self.block_size,
+                                  (self.grid_x + x * self.block_size, self.grid_y + y * self.block_size,
                                    self.block_size - 1, self.block_size - 1))
                     
         # Draw current piece
@@ -178,8 +225,8 @@ class TetrisGame:
                 for x, cell in enumerate(row):
                     if cell:
                         pygame.draw.rect(self.screen, COLORS['CYAN'],
-                                      ((self.current_piece_x + x) * self.block_size,
-                                       (self.current_piece_y + y) * self.block_size,
+                                      (self.grid_x + (self.current_piece_x + x) * self.block_size,
+                                       self.grid_y + (self.current_piece_y + y) * self.block_size,
                                        self.block_size - 1, self.block_size - 1))
                                        
         # Draw score
